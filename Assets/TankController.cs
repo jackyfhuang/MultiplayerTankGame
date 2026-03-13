@@ -15,6 +15,10 @@ public class TankController : MonoBehaviour
     private Rigidbody2D rb;
     private BoxCollider2D boxCollider;
     private TankHealth health;
+
+    // Network synchronization
+    private bool isInitialized = false;
+    public string ownerPlayerId;
     
     void Start()
     {
@@ -56,6 +60,27 @@ public class TankController : MonoBehaviour
 
     void Update()
     {
+        // Network initialization check
+        if (!isInitialized)
+        {
+            if (NetworkManager.Instance != null &&
+                !string.IsNullOrEmpty(NetworkManager.Instance.playerId))
+            {
+                // This tank doesn't belong to us — disable it
+                if (NetworkManager.Instance.playerId != ownerPlayerId)
+                {
+                    enabled = false;
+                    return;
+                }
+                isInitialized = true;
+            }
+            else
+            {
+                // If no NetworkManager, allow local play
+                isInitialized = true;
+            }
+        }
+
         if (IsDead())
             return;
         
@@ -64,13 +89,26 @@ public class TankController : MonoBehaviour
             Shoot();
             nextFire = Time.time + fireRate;
         }
+
+        // Send our position to the server every frame (if networked)
+        if (NetworkManager.Instance != null && NetworkManager.Instance.playerId == ownerPlayerId)
+        {
+            _ = NetworkManager.Instance.SendMovement(
+                transform.position.x,
+                transform.position.y,
+                transform.rotation.eulerAngles.z
+            );
+        }
     }
 
     void FixedUpdate()
     {
-        if (IsDead())
+        if (!isInitialized || IsDead())
         {
-            rb.linearVelocity = Vector2.zero;
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector2.zero;
+            }
             return;
         }
         
@@ -108,6 +146,16 @@ public class TankController : MonoBehaviour
         if (bulletCollider != null && boxCollider != null)
         {
             Physics2D.IgnoreCollision(bulletCollider, boxCollider, true);
+        }
+
+        // After Instantiate, also tell the server we fired (if networked)
+        if (NetworkManager.Instance != null && NetworkManager.Instance.playerId == ownerPlayerId)
+        {
+            _ = NetworkManager.Instance.SendShoot(
+                firePoint.position.x,
+                firePoint.position.y,
+                firePoint.rotation.eulerAngles.z
+            );
         }
     }
 }
