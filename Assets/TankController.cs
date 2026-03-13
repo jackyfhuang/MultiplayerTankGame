@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public class TankController : MonoBehaviour
@@ -32,13 +33,22 @@ public class TankController : MonoBehaviour
     private bool isInitialized = false;
     public string ownerPlayerId;
 
+    [Header("Debug")]
+    public bool offlineMode = false;
+
     void Update()
     {
         if (!isInitialized)
         {
-            if (NetworkManager.Instance != null &&
+            if (offlineMode)
+            {
+                isInitialized = true;
+                return;
+            }
+            else if (NetworkManager.Instance != null &&
                 !string.IsNullOrEmpty(NetworkManager.Instance.playerId))
             {
+                Debug.Log($"Client assigned: {NetworkManager.Instance.playerId}. This tank owner: {ownerPlayerId}");
                 // This tank doesn't belong to us — disable it
                 if (NetworkManager.Instance.playerId != ownerPlayerId)
                 {
@@ -74,11 +84,14 @@ public class TankController : MonoBehaviour
         }
 
         // Send our position to the server every frame
-        _ = NetworkManager.Instance.SendMovement(
-            transform.position.x,
-            transform.position.y,
-            transform.rotation.eulerAngles.z
-        );
+        if (!offlineMode)
+        {
+            _ = NetworkManager.Instance.SendMovement(
+                transform.position.x,
+                transform.position.y,
+                transform.rotation.eulerAngles.z
+            );
+        }
     }
 
     void Shoot()
@@ -107,11 +120,14 @@ public class TankController : MonoBehaviour
         }
 
         // After Instantiate, also tell the server we fired
-        _ = NetworkManager.Instance.SendShoot(
-            firePoint.position.x,
-            firePoint.position.y,
-            firePoint.rotation.eulerAngles.z
-        );
+        if (!offlineMode)
+        {
+            _ = NetworkManager.Instance.SendShoot(
+                firePoint.position.x,
+                firePoint.position.y,
+                firePoint.rotation.eulerAngles.z
+            );
+        }
     }
 
     void ClampToScreen()

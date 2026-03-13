@@ -17,6 +17,7 @@ public class TankHub : Hub
             // Reject if 2 players already connected
             if (connectedPlayers.Count >= 2)
             {
+                Console.WriteLine($"Connection rejected for {Context.ConnectionId}: Server full.");
                 Context.Abort();
                 return;
             }
@@ -67,23 +68,23 @@ public class TankHub : Hub
 
     // ---- MOVEMENT ----
 
-    // Client calls this when their tank moves
-    // Server broadcasts it to all OTHER clients
+    // Replace the SendMovement and SendShoot methods with these:
+
     public async Task SendMovement(int sequenceNumber, float x, float y, float rotation)
     {
-        string playerId = connectedPlayers[Context.ConnectionId];
-
-        await Clients.Others.SendAsync("ReceiveMovement", playerId, sequenceNumber, x, y, rotation);
+        // Check if the sender's ID exists in our dictionary
+        if (connectedPlayers.TryGetValue(Context.ConnectionId, out string? playerId))
+        {
+            // Broadcast to all clients EXCEPT the sender
+            await Clients.Others.SendAsync("ReceiveMovement", playerId, sequenceNumber, x, y, rotation);
+        }
     }
 
-    // ---- SHOOTING ----
-
-    // Client calls this when they fire
-    // Server broadcasts it to all OTHER clients
     public async Task SendShoot(int sequenceNumber, float x, float y, float rotation)
     {
-        string playerId = connectedPlayers[Context.ConnectionId];
-
-        await Clients.Others.SendAsync("ReceiveShoot", playerId, x, sequenceNumber, y, rotation);
+        if (connectedPlayers.TryGetValue(Context.ConnectionId, out string? playerId))
+        {
+            await Clients.Others.SendAsync("ReceiveShoot", playerId, sequenceNumber, x, y, rotation);
+        }
     }
 }

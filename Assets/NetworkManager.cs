@@ -25,9 +25,6 @@ public class NetworkManager : MonoBehaviour
     public delegate void PlayerDisconnected(string playerId);
     public static event PlayerDisconnected OnPlayerDisconnected;
 
-    public delegate void PlayerAssigned(string playerId);
-    public static event PlayerAssigned OnPlayerAssigned;
-
     private int movementSequence = 0;
     private int shootSequence = 0;
 
@@ -35,7 +32,7 @@ public class NetworkManager : MonoBehaviour
     private Dictionary<string, int> lastShootSeq = new Dictionary<string, int>();
 
     [Range(0f, 1f)]
-    public float simulatedPacketLossRate = 0.1f;
+    public float simulatedPacketLossRate = 0.0f;
 
     // pending playerId set by background thread, applied in Update()
     private string _pendingPlayerId = null;
