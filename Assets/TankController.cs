@@ -22,13 +22,34 @@ public class TankController : MonoBehaviour
     public KeyCode rotateRightKey;
     public KeyCode fireKey;
 
+    
     void Start()
     {
         cam = Camera.main;
     }
 
+    // Network synchronization
+    private bool isInitialized = false;
+    public string ownerPlayerId;
+
     void Update()
     {
+        if (!isInitialized)
+        {
+            if (NetworkManager.Instance != null &&
+                !string.IsNullOrEmpty(NetworkManager.Instance.playerId))
+            {
+                // This tank doesn't belong to us — disable it
+                if (NetworkManager.Instance.playerId != ownerPlayerId)
+                {
+                    enabled = false;
+                    return;
+                }
+                isInitialized = true;
+            }
+            return; // Skip this frame until initialized
+        }
+
         // Get input
         float moveInput = 0f;
         if (Input.GetKey(moveForwardKey)) moveInput = 1f;
@@ -51,6 +72,13 @@ public class TankController : MonoBehaviour
             Shoot();
             nextFire = Time.time + fireRate;
         }
+
+        // Send our position to the server every frame
+        _ = NetworkManager.Instance.SendMovement(
+            transform.position.x,
+            transform.position.y,
+            transform.rotation.eulerAngles.z
+        );
     }
 
     void Shoot()
@@ -77,6 +105,13 @@ public class TankController : MonoBehaviour
         {
             bulletScript.SetOwner(gameObject);
         }
+
+        // After Instantiate, also tell the server we fired
+        _ = NetworkManager.Instance.SendShoot(
+            firePoint.position.x,
+            firePoint.position.y,
+            firePoint.rotation.eulerAngles.z
+        );
     }
 
     void ClampToScreen()
