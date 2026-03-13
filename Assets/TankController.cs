@@ -11,9 +11,11 @@ public class TankController : MonoBehaviour
     public Transform firePoint;      // Where bullets spawn
     public float fireRate = 0.3f;
     private float nextFire = 0f;
-    public float boundaryPadding = 0.5f;    // for boundary checking
 
     private Camera cam;
+    private Rigidbody2D rb;
+    private BoxCollider2D boxCollider;
+    private TankHealth health;
 
     // Assign these per tank instance in the Inspector
     public KeyCode moveForwardKey;
@@ -22,10 +24,46 @@ public class TankController : MonoBehaviour
     public KeyCode rotateRightKey;
     public KeyCode fireKey;
 
+    public float boundaryPadding = 0.5f;
     
     void Start()
     {
         cam = Camera.main;
+
+        // Get or add Rigidbody2D component
+        rb = GetComponent<Rigidbody2D>();
+        if (rb == null)
+        {
+            rb = gameObject.AddComponent<Rigidbody2D>();
+        }
+        
+        // Get BoxCollider2D for collision checking
+        boxCollider = GetComponent<BoxCollider2D>();
+        if (boxCollider == null)
+        {
+            Debug.LogError("TankController: BoxCollider2D is missing! Tank needs a collider to detect walls.");
+        }
+        else
+        {
+            boxCollider.isTrigger = false;
+        }
+        
+        // Cache health component
+        health = GetComponent<TankHealth>();
+        
+        // Configure Rigidbody2D
+        rb.bodyType = RigidbodyType2D.Dynamic;
+        rb.mass = 1000f;
+        rb.gravityScale = 0f;
+        rb.angularDamping = 0f;
+        rb.linearDamping = 0f;
+        rb.constraints = RigidbodyConstraints2D.FreezeRotation;
+        rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+    }
+
+    bool IsDead()
+    {
+        return health != null && health.IsDead();
     }
 
     // Network synchronization
@@ -34,6 +72,9 @@ public class TankController : MonoBehaviour
 
     void Update()
     {
+        if (IsDead())
+            return;
+
         if (!isInitialized)
         {
             if (NetworkManager.Instance != null &&
@@ -81,6 +122,21 @@ public class TankController : MonoBehaviour
         );
     }
 
+    void FixedUpdate()
+    {
+        if (IsDead())
+        {
+            rb.linearVelocity = Vector2.zero;
+            return;
+        }
+        
+        float moveInput = Input.GetAxis("Vertical");
+        float rotateInput = Input.GetAxis("Horizontal");
+
+        transform.Rotate(Vector3.forward * -rotateInput * rotateSpeed * Time.fixedDeltaTime);
+        rb.linearVelocity = (Vector2)transform.up * moveInput * moveSpeed;
+    }
+
     void Shoot()
     {
         // Check if references are assigned
@@ -96,14 +152,18 @@ public class TankController : MonoBehaviour
             return;
         }
 
-        // Spawn a bullet at the FirePoint's position and rotation
         GameObject bullet = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
         
-        // Set this tank as the owner so the bullet won't collide with us
         Bullet bulletScript = bullet.GetComponent<Bullet>();
         if (bulletScript != null)
         {
             bulletScript.SetOwner(gameObject);
+        }
+
+        Collider2D bulletCollider = bullet.GetComponent<Collider2D>();
+        if (bulletCollider != null && boxCollider != null)
+        {
+            Physics2D.IgnoreCollision(bulletCollider, boxCollider, true);
         }
 
         // After Instantiate, also tell the server we fired
@@ -116,6 +176,7 @@ public class TankController : MonoBehaviour
 
     void ClampToScreen()
     {
+        if (cam == null) return;
         // Get world positions of the screen's bottom-left and top-right corners
         Vector3 minBounds = cam.ViewportToWorldPoint(new Vector3(0, 0, 0));
         Vector3 maxBounds = cam.ViewportToWorldPoint(new Vector3(1, 1, 0));
