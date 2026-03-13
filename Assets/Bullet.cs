@@ -5,7 +5,7 @@ public class Bullet : MonoBehaviour
     public float speed = 10f;   // How fast the bullet moves
     public float lifetime = 3f; // How long before it disappears
     public float ignoreCollisionTime = 0.1f; // Time to ignore collisions after spawning
-    public int maxBounces = 3;  // How many times the bullet can bounce off walls
+    public int maxBounces = 5;  // How many times the bullet can bounce off walls
     public int damage = 100;    // Damage dealt to tanks (one-shot kill by default)
 
     private Rigidbody2D rb;

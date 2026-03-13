@@ -389,7 +389,7 @@ MonoBehaviour:
   worldHeight: 15
   wallThickness: 0.5
   wallPrefab: {fileID: 4352582782192151699, guid: e14a4106c157904429c24ed7f04a15af, type: 3}
-  tankPrefab: {fileID: 8131205977912376167, guid: 915efdc1bb81eab469691439587c664a, type: 3}
+  tankPrefab: {fileID: 676774373641441343, guid: 71e3867daf49f694aaa688f85140935f, type: 3}
   tankSpawnPosition: {x: 0, y: 0}
   setupCameraFollow: 1
   generateOnStart: 1
