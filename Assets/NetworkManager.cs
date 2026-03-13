@@ -1,16 +1,18 @@
-using UnityEngine;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using UnityEngine;
 
 public class NetworkManager : MonoBehaviour
 {
-    public static NetworkManager Instance; // Global access from other scripts
+    public static NetworkManager Instance;
 
     private HubConnection connection;
 
-    public string playerId;  // Will be "Player1" or "Player2", assigned by server
+    public string playerId;
 
-    // Events that other scripts can listen to
     public delegate void MovementReceived(string playerId, float x, float y, float rotation);
     public static event MovementReceived OnMovementReceived;
 
@@ -26,9 +28,23 @@ public class NetworkManager : MonoBehaviour
     public delegate void PlayerAssigned(string playerId);
     public static event PlayerAssigned OnPlayerAssigned;
 
+    private int movementSequence = 0;
+    private int shootSequence = 0;
+
+    private Dictionary<string, int> lastMovementSeq = new Dictionary<string, int>();
+    private Dictionary<string, int> lastShootSeq = new Dictionary<string, int>();
+
+    [Range(0f, 1f)]
+    public float simulatedPacketLossRate = 0.1f;
+
+    // pending playerId set by background thread, applied in Update()
+    private string _pendingPlayerId = null;
+
+    // instead of calling Unity APIs directly from the background thread
+    private ConcurrentQueue<System.Action> _mainThreadQueue = new ConcurrentQueue<System.Action>();
+
     void Awake()
     {
-        // Singleton pattern so any script can access NetworkManager.Instance
         if (Instance == null)
         {
             Instance = this;
@@ -40,6 +56,21 @@ public class NetworkManager : MonoBehaviour
         }
     }
 
+    // drains the main-thread queue and applies pending playerId
+    void Update()
+    {
+        // Apply playerId on the main thread so TankController polling sees it
+        if (_pendingPlayerId != null)
+        {
+            playerId = _pendingPlayerId;
+            _pendingPlayerId = null;
+        }
+
+        // Drain all queued callbacks onto the main thread
+        while (_mainThreadQueue.TryDequeue(out System.Action action))
+            action();
+    }
+
     async void Start()
     {
         await ConnectToServer();
@@ -47,48 +78,93 @@ public class NetworkManager : MonoBehaviour
 
     async Task ConnectToServer()
     {
-        // Build the connection to your SignalR hub
         connection = new HubConnectionBuilder()
-            .WithUrl("http://localhost:5190/tankgame")
+            .WithUrl("http://localhost:5190/tankgame", options => {
+                options.SkipNegotiation = true;
+                options.Transports = HttpTransportType.WebSockets;
+            })
             .WithAutomaticReconnect()
             .Build();
 
-        // Listen for server events
-
-        // Server tells us which player we are
         connection.On<string>("AssignedPlayerId", (id) =>
         {
-            playerId = id;
-            Debug.Log($"Assigned as {playerId}");
+            _pendingPlayerId = id;
+            Debug.Log($"Assigned as {id}");
         });
 
-        // Server tells us another player connected
         connection.On<string>("PlayerConnected", (id) =>
         {
-            Debug.Log($"{id} connected");
-            OnPlayerConnected?.Invoke(id);
+            _mainThreadQueue.Enqueue(() =>
+            {
+                Debug.Log($"{id} connected");
+                OnPlayerConnected?.Invoke(id);
+            });
         });
 
-        // Server tells us a player disconnected
         connection.On<string>("PlayerDisconnected", (id) =>
         {
-            Debug.Log($"{id} disconnected");
-            OnPlayerDisconnected?.Invoke(id);
+            _mainThreadQueue.Enqueue(() =>
+            {
+                Debug.Log($"{id} disconnected");
+                OnPlayerDisconnected?.Invoke(id);
+            });
         });
 
-        // Server sends us the opponent's movement
-        connection.On<string, float, float, float>("ReceiveMovement", (id, x, y, rotation) =>
-        {
-            OnMovementReceived?.Invoke(id, x, y, rotation);
-        });
+        connection.On<string, int, float, float, float>("ReceiveMovement",
+            (id, sequenceNumber, x, y, rotation) =>
+            {
+                _mainThreadQueue.Enqueue(() =>
+                {
+                    if (Random.value < simulatedPacketLossRate)
+                    {
+                        Debug.Log($"[UDP Sim] Dropped movement packet #{sequenceNumber} from {id}");
+                        return;
+                    }
 
-        // Server sends us the opponent's shot
-        connection.On<string, float, float, float>("ReceiveShoot", (id, x, y, rotation) =>
-        {
-            OnShootReceived?.Invoke(id, x, y, rotation);
-        });
+                    if (lastMovementSeq.TryGetValue(id, out int lastSeq) && sequenceNumber <= lastSeq)
+                    {
+                        Debug.Log($"[UDP Sim] Duplicate movement packet #{sequenceNumber} from {id}, discarding");
+                        return;
+                    }
 
-        // Start the connection
+                    if (lastMovementSeq.TryGetValue(id, out int prev) && sequenceNumber > prev + 1)
+                    {
+                        Debug.Log($"[UDP Sim] Lost {sequenceNumber - prev - 1} movement packet(s) from {id} " +
+                                  $"(last: {prev}, got: {sequenceNumber}) — using last known position");
+                    }
+
+                    lastMovementSeq[id] = sequenceNumber;
+                    OnMovementReceived?.Invoke(id, x, y, rotation);
+                });
+            });
+
+        connection.On<string, int, float, float, float>("ReceiveShoot",
+            (id, sequenceNumber, x, y, rotation) =>
+            {
+                _mainThreadQueue.Enqueue(() =>
+                {
+                    if (Random.value < simulatedPacketLossRate)
+                    {
+                        Debug.Log($"[UDP Sim] Dropped shoot packet #{sequenceNumber} from {id}");
+                        return;
+                    }
+
+                    if (lastShootSeq.TryGetValue(id, out int lastSeq) && sequenceNumber <= lastSeq)
+                    {
+                        Debug.Log($"[UDP Sim] Duplicate shoot packet #{sequenceNumber} from {id}, discarding");
+                        return;
+                    }
+
+                    if (lastShootSeq.TryGetValue(id, out int prev) && sequenceNumber > prev + 1)
+                    {
+                        Debug.Log($"[UDP Sim] Lost {sequenceNumber - prev - 1} shoot packet(s) from {id}");
+                    }
+
+                    lastShootSeq[id] = sequenceNumber;
+                    OnShootReceived?.Invoke(id, x, y, rotation);
+                });
+            });
+
         try
         {
             await connection.StartAsync();
@@ -100,30 +176,28 @@ public class NetworkManager : MonoBehaviour
         }
     }
 
-    // Called by TankController to send movement to server
     public async Task SendMovement(float x, float y, float rotation)
     {
         if (connection.State == HubConnectionState.Connected)
         {
-            await connection.InvokeAsync("SendMovement", x, y, rotation);
+            movementSequence++;
+            await connection.InvokeAsync("SendMovement", movementSequence, x, y, rotation);
         }
     }
 
-    // Called by TankController to send a shot to server
     public async Task SendShoot(float x, float y, float rotation)
     {
         if (connection.State == HubConnectionState.Connected)
         {
-            await connection.InvokeAsync("SendShoot", x, y, rotation);
+            // counter, corrupting sequence tracking for both message types
+            shootSequence++;
+            await connection.InvokeAsync("SendShoot", shootSequence, x, y, rotation);
         }
     }
 
-    // Clean up connection when game closes
     async void OnDestroy()
     {
         if (connection != null)
-        {
             await connection.StopAsync();
-        }
     }
 }

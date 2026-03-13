@@ -30,6 +30,16 @@ A Unity 2D tank shooting game built for multiplayer functionality.
    - FirePoint transform assigned to the `firePoint` field
 4. Press Play to start the game
 
+## Run Multiplayer
+### Step 1
+Cd into TankGameServer
+
+### Step 2
+Set up and determine which port the server will be running on
+`dotnet run`
+
+Note: Make sure networkmanager.cs and program.cs has the localhost matching what is being listen in with this command
+
 ## Requirements
 
 - Unity 2024.3 or later

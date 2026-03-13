@@ -69,21 +69,21 @@ public class TankHub : Hub
 
     // Client calls this when their tank moves
     // Server broadcasts it to all OTHER clients
-    public async Task SendMovement(float x, float y, float rotation)
+    public async Task SendMovement(int sequenceNumber, float x, float y, float rotation)
     {
         string playerId = connectedPlayers[Context.ConnectionId];
 
-        await Clients.Others.SendAsync("ReceiveMovement", playerId, x, y, rotation);
+        await Clients.Others.SendAsync("ReceiveMovement", playerId, sequenceNumber, x, y, rotation);
     }
 
     // ---- SHOOTING ----
 
     // Client calls this when they fire
     // Server broadcasts it to all OTHER clients
-    public async Task SendShoot(float x, float y, float rotation)
+    public async Task SendShoot(int sequenceNumber, float x, float y, float rotation)
     {
         string playerId = connectedPlayers[Context.ConnectionId];
 
-        await Clients.Others.SendAsync("ReceiveShoot", playerId, x, y, rotation);
+        await Clients.Others.SendAsync("ReceiveShoot", playerId, x, sequenceNumber, y, rotation);
     }
 }
