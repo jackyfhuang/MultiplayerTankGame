@@ -14,7 +14,14 @@ public class TankController : MonoBehaviour
     public float boundaryPadding = 0.5f;    // for boundary checking
 
     private Camera cam;
-    
+
+    // Assign these per tank instance in the Inspector
+    public KeyCode moveForwardKey;
+    public KeyCode moveBackwardKey;
+    public KeyCode rotateLeftKey;
+    public KeyCode rotateRightKey;
+    public KeyCode fireKey;
+
     void Start()
     {
         cam = Camera.main;
@@ -23,8 +30,13 @@ public class TankController : MonoBehaviour
     void Update()
     {
         // Get input
-        float moveInput = Input.GetAxis("Vertical");   // W/S or Up/Down
-        float rotateInput = Input.GetAxis("Horizontal"); // A/D or Left/Right
+        float moveInput = 0f;
+        if (Input.GetKey(moveForwardKey)) moveInput = 1f;
+        if (Input.GetKey(moveBackwardKey)) moveInput = -1f;
+
+        float rotateInput = 0f;
+        if (Input.GetKey(rotateLeftKey)) rotateInput = 1f;
+        if (Input.GetKey(rotateRightKey)) rotateInput = -1f;
 
         // Move forward/backward
         transform.Translate(Vector2.up * moveInput * moveSpeed * Time.deltaTime);
@@ -34,7 +46,7 @@ public class TankController : MonoBehaviour
 
         ClampToScreen(); //prevent tank from going off-screen
 
-        if (Input.GetKey(KeyCode.Space) && Time.time > nextFire)
+        if (Input.GetKey(fireKey) && Time.time > nextFire)
         {
             Shoot();
             nextFire = Time.time + fireRate;
