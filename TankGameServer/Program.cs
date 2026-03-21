@@ -21,6 +21,8 @@ app.UseCors();
 // Unity will connect to: ex. localhost:5000/tankgame
 app.MapHub<TankHub>("/tankgame");
 
-app.Urls.Add("http://localhost:5190");
+// Listen on all network interfaces (0.0.0.0) to allow external connections
+// Use localhost for local-only, or 0.0.0.0 for network access
+app.Urls.Add("http://0.0.0.0:5190");
 
 app.Run();

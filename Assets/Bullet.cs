@@ -11,6 +11,12 @@ public class Bullet : MonoBehaviour
     private Rigidbody2D rb;
     private float spawnTime;
     private GameObject owner; // The tank that shot this bullet
+
+    [Tooltip("False for bullets spawned from ReceiveShoot (visual only). True for your own fired shots.")]
+    public bool authoritativeDamage = true;
+
+    [Tooltip("Set to TankController.ownerPlayerId when firing; used to decide if this client reports hits.")]
+    public string shooterPlayerId;
     private int bounceCount = 0;
     private float lastBounceTime = 0f; // Track when we last bounced to prevent multiple bounces in one frame
     private const float BOUNCE_COOLDOWN = 0.05f; // Minimum time between bounces
@@ -45,6 +51,22 @@ public class Bullet : MonoBehaviour
     public void SetOwner(GameObject tank)
     {
         owner = tank;
+    }
+
+    public void SetShooterPlayerId(string id)
+    {
+        shooterPlayerId = id;
+    }
+
+    static string ResolveVictimNetworkId(GameObject hitRoot)
+    {
+        TankController tc = hitRoot.GetComponent<TankController>();
+        if (tc != null && !string.IsNullOrEmpty(tc.ownerPlayerId))
+            return tc.ownerPlayerId;
+        RemoteTankController rtc = hitRoot.GetComponent<RemoteTankController>();
+        if (rtc != null && !string.IsNullOrEmpty(rtc.remotePlayerId))
+            return rtc.remotePlayerId;
+        return null;
     }
 
     bool ShouldIgnoreCollision(Collision2D collision)
@@ -98,11 +120,39 @@ public class Bullet : MonoBehaviour
 
         if (collision.gameObject.CompareTag("Player"))
         {
-            TankHealth tankHealth = collision.gameObject.GetComponent<TankHealth>();
-            if (tankHealth != null && !tankHealth.IsDead())
+            if (!authoritativeDamage)
             {
-                tankHealth.TakeDamage(damage);
+                Destroy(gameObject);
+                return;
             }
+
+            TankHealth tankHealth = collision.gameObject.GetComponent<TankHealth>();
+            NetworkManager nm = NetworkManager.Instance;
+            bool useNetwork = nm != null && nm.IsHubConnected && !string.IsNullOrEmpty(nm.playerId);
+
+            if (useNetwork)
+            {
+                if (string.IsNullOrEmpty(shooterPlayerId) || nm.playerId != shooterPlayerId)
+                {
+                    Destroy(gameObject);
+                    return;
+                }
+
+                string victimId = ResolveVictimNetworkId(collision.gameObject);
+                if (!string.IsNullOrEmpty(victimId) &&
+                    victimId != shooterPlayerId &&
+                    tankHealth != null &&
+                    !tankHealth.IsDead())
+                {
+                    _ = nm.SendPlayerHit(victimId, damage);
+                }
+
+                Destroy(gameObject);
+                return;
+            }
+
+            if (tankHealth != null && !tankHealth.IsDead())
+                tankHealth.TakeDamage(damage);
             Destroy(gameObject);
             return;
         }

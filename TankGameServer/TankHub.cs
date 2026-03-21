@@ -84,6 +84,26 @@ public class TankHub : Hub
     {
         string playerId = connectedPlayers[Context.ConnectionId];
 
-        await Clients.Others.SendAsync("ReceiveShoot", playerId, x, sequenceNumber, y, rotation);
+        await Clients.Others.SendAsync("ReceiveShoot", playerId, sequenceNumber, x, y, rotation);
+    }
+
+    // ---- HITS (authoritative: shooter's client detects collision, everyone applies damage) ----
+
+    public async Task SendPlayerHit(string victimPlayerId, int damage)
+    {
+        if (string.IsNullOrEmpty(victimPlayerId))
+            return;
+
+        string attackerId;
+        lock (connectedPlayers)
+        {
+            if (!connectedPlayers.TryGetValue(Context.ConnectionId, out attackerId))
+                return;
+        }
+
+        if (victimPlayerId == attackerId)
+            return;
+
+        await Clients.All.SendAsync("ReceivePlayerHit", victimPlayerId, damage);
     }
 }

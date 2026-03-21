@@ -12,6 +12,12 @@ public class NetworkManager : MonoBehaviour
     private HubConnection connection;
 
     public string playerId;
+    
+    [Header("Server Settings")]
+    [Tooltip("Server IP address. Use 'localhost' for local play, or your computer's IP (e.g., 192.168.1.76) for network play")]
+    public string serverAddress = "localhost";
+    [Tooltip("Server port")]
+    public int serverPort = 5190;
 
     public delegate void MovementReceived(string playerId, float x, float y, float rotation);
     public static event MovementReceived OnMovementReceived;
@@ -27,6 +33,9 @@ public class NetworkManager : MonoBehaviour
 
     public delegate void PlayerAssigned(string playerId);
     public static event PlayerAssigned OnPlayerAssigned;
+
+    public delegate void PlayerHitReceived(string victimPlayerId, int damage);
+    public static event PlayerHitReceived OnPlayerHitReceived;
 
     private int movementSequence = 0;
     private int shootSequence = 0;
@@ -63,7 +72,9 @@ public class NetworkManager : MonoBehaviour
         if (_pendingPlayerId != null)
         {
             playerId = _pendingPlayerId;
+            string assignedId = _pendingPlayerId;
             _pendingPlayerId = null;
+            OnPlayerAssigned?.Invoke(assignedId);
         }
 
         // Drain all queued callbacks onto the main thread
@@ -78,8 +89,11 @@ public class NetworkManager : MonoBehaviour
 
     async Task ConnectToServer()
     {
+        string serverUrl = $"http://{serverAddress}:{serverPort}/tankgame";
+        Debug.Log($"Connecting to server at {serverUrl}");
+        
         connection = new HubConnectionBuilder()
-            .WithUrl("http://localhost:5190/tankgame", options => {
+            .WithUrl(serverUrl, options => {
                 options.SkipNegotiation = true;
                 options.Transports = HttpTransportType.WebSockets;
             })
@@ -123,7 +137,7 @@ public class NetworkManager : MonoBehaviour
 
                     if (lastMovementSeq.TryGetValue(id, out int lastSeq) && sequenceNumber <= lastSeq)
                     {
-                        Debug.Log($"[UDP Sim] Duplicate movement packet #{sequenceNumber} from {id}, discarding");
+                        // Duplicate packet detected and discarded (normal behavior)
                         return;
                     }
 
@@ -151,7 +165,7 @@ public class NetworkManager : MonoBehaviour
 
                     if (lastShootSeq.TryGetValue(id, out int lastSeq) && sequenceNumber <= lastSeq)
                     {
-                        Debug.Log($"[UDP Sim] Duplicate shoot packet #{sequenceNumber} from {id}, discarding");
+                        // Duplicate packet detected and discarded (normal behavior)
                         return;
                     }
 
@@ -162,6 +176,15 @@ public class NetworkManager : MonoBehaviour
 
                     lastShootSeq[id] = sequenceNumber;
                     OnShootReceived?.Invoke(id, x, y, rotation);
+                });
+            });
+
+        connection.On<string, int>("ReceivePlayerHit",
+            (victimPlayerId, damage) =>
+            {
+                _mainThreadQueue.Enqueue(() =>
+                {
+                    OnPlayerHitReceived?.Invoke(victimPlayerId, damage);
                 });
             });
 
@@ -193,6 +216,15 @@ public class NetworkManager : MonoBehaviour
             shootSequence++;
             await connection.InvokeAsync("SendShoot", shootSequence, x, y, rotation);
         }
+    }
+
+    public bool IsHubConnected =>
+        connection != null && connection.State == HubConnectionState.Connected;
+
+    public async Task SendPlayerHit(string victimPlayerId, int damage)
+    {
+        if (connection != null && connection.State == HubConnectionState.Connected)
+            await connection.InvokeAsync("SendPlayerHit", victimPlayerId, damage);
     }
 
     async void OnDestroy()

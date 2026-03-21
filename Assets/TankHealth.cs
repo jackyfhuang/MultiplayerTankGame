@@ -16,6 +16,35 @@ public class TankHealth : MonoBehaviour
     private SpriteRenderer renderer;
     private Collider2D collider;
     
+    void OnEnable()
+    {
+        NetworkManager.OnPlayerHitReceived += HandleSyncedHit;
+    }
+
+    void OnDisable()
+    {
+        NetworkManager.OnPlayerHitReceived -= HandleSyncedHit;
+    }
+
+    void HandleSyncedHit(string victimPlayerId, int damageAmount)
+    {
+        string myId = GetNetworkPlayerId();
+        if (string.IsNullOrEmpty(myId) || myId != victimPlayerId)
+            return;
+        TakeDamage(damageAmount);
+    }
+
+    string GetNetworkPlayerId()
+    {
+        TankController tc = GetComponent<TankController>();
+        if (tc != null && !string.IsNullOrEmpty(tc.ownerPlayerId))
+            return tc.ownerPlayerId;
+        RemoteTankController rtc = GetComponent<RemoteTankController>();
+        if (rtc != null && !string.IsNullOrEmpty(rtc.remotePlayerId))
+            return rtc.remotePlayerId;
+        return null;
+    }
+
     void Start()
     {
         currentHealth = maxHealth;

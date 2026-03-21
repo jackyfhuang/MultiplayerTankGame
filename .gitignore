@@ -70,3 +70,10 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# Self-contained Linux publish for VPS deploy (large)
+TankGameServer/publish-linux/
+
+# TankGameServer .NET build output (restore/build on each machine)
+TankGameServer/bin/
+TankGameServer/obj/

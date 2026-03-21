@@ -7,6 +7,10 @@ public class RemoteTankController : MonoBehaviour
 	// The player ID this tank represents e.g. "Player2"
 	public string remotePlayerId;
     private ConcurrentQueue<Action> _mainThreadActions = new ConcurrentQueue<Action>();
+    
+    [Header("Bullet Settings")]
+    public GameObject bulletPrefab;
+    public Transform firePoint;
 
 
     void OnEnable()
@@ -37,8 +41,22 @@ public class RemoteTankController : MonoBehaviour
 
         _mainThreadActions.Enqueue(() =>
         {
-            transform.position = new Vector3(x, y, 0);
-            transform.rotation = Quaternion.Euler(0, 0, rotation);
+            // If this GameObject was destroyed or doesn't exist, the movement handler shouldn't be called
+            // But just in case, check if we're still valid
+            if (this == null || gameObject == null) return;
+            
+            // Use Rigidbody2D if available for smoother movement
+            Rigidbody2D rb = GetComponent<Rigidbody2D>();
+            if (rb != null)
+            {
+                rb.MovePosition(new Vector2(x, y));
+                rb.MoveRotation(rotation);
+            }
+            else
+            {
+                transform.position = new Vector3(x, y, 0);
+                transform.rotation = Quaternion.Euler(0, 0, rotation);
+            }
         });
     }
 
@@ -47,11 +65,30 @@ public class RemoteTankController : MonoBehaviour
 		// Only shoot if the message is for our remote player
 		if (playerId != remotePlayerId) return;
 
-        // Shooting logic will go here in Stage 3
         _mainThreadActions.Enqueue(() =>
         {
-            Debug.Log($"{playerId} fired at {x}, {y}");
-            // Stage 3 shooting logic here
+            if (bulletPrefab == null)
+            {
+                Debug.LogWarning($"RemoteTankController: Bullet prefab not assigned for {playerId}");
+                return;
+            }
+            
+            // Spawn bullet at the remote player's fire point position
+            Vector3 spawnPos = firePoint != null ? firePoint.position : new Vector3(x, y, 0);
+            Quaternion spawnRot = firePoint != null ? firePoint.rotation : Quaternion.Euler(0, 0, rotation);
+            
+            GameObject bullet = Instantiate(bulletPrefab, spawnPos, spawnRot);
+            
+            // Set the remote tank as the owner so bullets don't collide with it
+            Bullet bulletScript = bullet.GetComponent<Bullet>();
+            if (bulletScript != null)
+            {
+                bulletScript.SetOwner(gameObject);
+                bulletScript.SetShooterPlayerId(remotePlayerId);
+                bulletScript.authoritativeDamage = false;
+            }
+            
+            Debug.Log($"{playerId} fired at {spawnPos}");
         });
     }
 }

@@ -19,9 +19,21 @@ public class TankController : MonoBehaviour
     // Network synchronization
     private bool isInitialized = false;
     public string ownerPlayerId;
+
+    // Assign these per tank instance in the Inspector
+    public KeyCode moveForwardKey;
+    public KeyCode moveBackwardKey;
+    public KeyCode rotateLeftKey;
+    public KeyCode rotateRightKey;
+    public KeyCode fireKey;
+
+    // Input values stored for physics-based movement
+    private float moveInput = 0f;
+    private float rotateInput = 0f;
     
     void Start()
     {
+
         // Get or add Rigidbody2D component
         rb = GetComponent<Rigidbody2D>();
         if (rb == null)
@@ -60,31 +72,49 @@ public class TankController : MonoBehaviour
 
     void Update()
     {
-        // Network initialization check
+        NetworkManager nm = NetworkManager.Instance;
+        if (nm != null && string.IsNullOrEmpty(ownerPlayerId) && !string.IsNullOrEmpty(nm.playerId))
+            ownerPlayerId = nm.playerId;
+
+        // Network initialization: local tank may spawn before server assigns playerId
         if (!isInitialized)
         {
-            if (NetworkManager.Instance != null &&
-                !string.IsNullOrEmpty(NetworkManager.Instance.playerId))
+            if (nm != null && !string.IsNullOrEmpty(nm.playerId))
             {
-                // This tank doesn't belong to us — disable it
-                if (NetworkManager.Instance.playerId != ownerPlayerId)
+                if (string.IsNullOrEmpty(ownerPlayerId))
+                    ownerPlayerId = nm.playerId;
+
+                if (ownerPlayerId != nm.playerId)
                 {
                     enabled = false;
                     return;
                 }
-                isInitialized = true;
             }
-            else
-            {
-                // If no NetworkManager, allow local play
-                isInitialized = true;
-            }
+
+            isInitialized = true;
         }
 
         if (IsDead())
             return;
+
+        // Read input using custom KeyCode system (for multiplayer compatibility)
+        moveInput = 0f;
+        if (Input.GetKey(moveForwardKey)) moveInput = 1f;
+        if (Input.GetKey(moveBackwardKey)) moveInput = -1f;
+
+        rotateInput = 0f;
+        if (Input.GetKey(rotateLeftKey)) rotateInput = 1f;
+        if (Input.GetKey(rotateRightKey)) rotateInput = -1f;
+
+        // Also support standard input for local play (fallback)
+        if (moveInput == 0f) moveInput = Input.GetAxis("Vertical");
+        if (rotateInput == 0f) rotateInput = Input.GetAxis("Horizontal");
+
+        // Check for firing - use custom key if set, otherwise fallback to Spacebar
+        bool shouldFire = (fireKey != KeyCode.None && Input.GetKey(fireKey)) || 
+                          (fireKey == KeyCode.None && Input.GetKey(KeyCode.Space));
         
-        if (Input.GetKey(KeyCode.Space) && Time.time > nextFire)
+        if (shouldFire && Time.time > nextFire)
         {
             Shoot();
             nextFire = Time.time + fireRate;
@@ -111,11 +141,11 @@ public class TankController : MonoBehaviour
             }
             return;
         }
-        
-        float moveInput = Input.GetAxis("Vertical");
-        float rotateInput = Input.GetAxis("Horizontal");
 
+        // Apply rotation using physics-safe transform rotation
         transform.Rotate(Vector3.forward * -rotateInput * rotateSpeed * Time.fixedDeltaTime);
+        
+        // Apply movement using Rigidbody2D physics (for wall collision)
         rb.linearVelocity = (Vector2)transform.up * moveInput * moveSpeed;
     }
 
@@ -140,8 +170,10 @@ public class TankController : MonoBehaviour
         if (bulletScript != null)
         {
             bulletScript.SetOwner(gameObject);
+            bulletScript.SetShooterPlayerId(ownerPlayerId);
+            bulletScript.authoritativeDamage = true;
         }
-        
+
         Collider2D bulletCollider = bullet.GetComponent<Collider2D>();
         if (bulletCollider != null && boxCollider != null)
         {

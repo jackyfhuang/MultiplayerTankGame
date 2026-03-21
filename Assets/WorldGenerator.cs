@@ -24,6 +24,8 @@ public class WorldGenerator : MonoBehaviour
     private GameObject wallParent;
     private GameObject spawnedTank;
     private const string WALL_TAG = "Wall";
+
+    public GameObject SpawnedLocalTank => spawnedTank;
     
     void Start()
     {
@@ -48,11 +50,8 @@ public class WorldGenerator : MonoBehaviour
         CreateWall("RightWall", new Vector2(worldWidth / 2, 0), new Vector2(wallThickness, worldHeight));
         
         spawnedTank = SpawnTank();
-        
-        if (setupCameraFollow)
-        {
+        if (setupCameraFollow && spawnedTank != null)
             SetupCameraFollow();
-        }
         
         Debug.Log($"World generated: {worldWidth}x{worldHeight} with tank at {tankSpawnPosition}");
     }
