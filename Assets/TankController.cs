@@ -30,6 +30,9 @@ public class TankController : MonoBehaviour
     // Input values stored for physics-based movement
     private float moveInput = 0f;
     private float rotateInput = 0f;
+
+    [Header("Debug")]
+    public bool offlineMode = false;
     
     void Start()
     {
@@ -79,6 +82,12 @@ public class TankController : MonoBehaviour
         // Network initialization: local tank may spawn before server assigns playerId
         if (!isInitialized)
         {
+            if (offlineMode)
+            {
+                isInitialized = true;
+                return;
+            }
+
             if (nm != null && !string.IsNullOrEmpty(nm.playerId))
             {
                 if (string.IsNullOrEmpty(ownerPlayerId))
@@ -121,7 +130,7 @@ public class TankController : MonoBehaviour
         }
 
         // Send our position to the server every frame (if networked)
-        if (NetworkManager.Instance != null && NetworkManager.Instance.playerId == ownerPlayerId)
+        if (!offlineMode && NetworkManager.Instance != null && NetworkManager.Instance.playerId == ownerPlayerId)
         {
             NetworkManager.Instance.SendMovement(
                 transform.position.x,
@@ -181,7 +190,7 @@ public class TankController : MonoBehaviour
         }
 
         // After Instantiate, also tell the server we fired (if networked)
-        if (NetworkManager.Instance != null && NetworkManager.Instance.playerId == ownerPlayerId)
+        if (!offlineMode && NetworkManager.Instance != null && NetworkManager.Instance.playerId == ownerPlayerId)
         {
             NetworkManager.Instance.SendShoot(
                 firePoint.position.x,

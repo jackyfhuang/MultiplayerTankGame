@@ -17,6 +17,7 @@ public class TankHub : Hub
             // Reject if 2 players already connected
             if (connectedPlayers.Count >= 2)
             {
+                Console.WriteLine($"Connection rejected for {Context.ConnectionId}: Server full.");
                 Context.Abort();
                 return;
             }
@@ -47,7 +48,7 @@ public class TankHub : Hub
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        string playerId;
+        string? playerId;
 
         lock (connectedPlayers)
         {
@@ -58,7 +59,7 @@ public class TankHub : Hub
         }
 
         // Tell remaining players someone left
-        await Clients.All.SendAsync("PlayerDisconnected", playerId);
+        await Clients.All.SendAsync("PlayerDisconnected", playerId!);
 
         Console.WriteLine($"{playerId} disconnected.");
 
@@ -67,24 +68,20 @@ public class TankHub : Hub
 
     // ---- MOVEMENT ----
 
-    // Client calls this when their tank moves
-    // Server broadcasts it to all OTHER clients
     public async Task SendMovement(int sequenceNumber, float x, float y, float rotation)
     {
-        string playerId = connectedPlayers[Context.ConnectionId];
-
-        await Clients.Others.SendAsync("ReceiveMovement", playerId, sequenceNumber, x, y, rotation);
+        if (connectedPlayers.TryGetValue(Context.ConnectionId, out string? playerId))
+        {
+            await Clients.Others.SendAsync("ReceiveMovement", playerId, sequenceNumber, x, y, rotation);
+        }
     }
 
-    // ---- SHOOTING ----
-
-    // Client calls this when they fire
-    // Server broadcasts it to all OTHER clients
     public async Task SendShoot(int sequenceNumber, float x, float y, float rotation)
     {
-        string playerId = connectedPlayers[Context.ConnectionId];
-
-        await Clients.Others.SendAsync("ReceiveShoot", playerId, sequenceNumber, x, y, rotation);
+        if (connectedPlayers.TryGetValue(Context.ConnectionId, out string? playerId))
+        {
+            await Clients.Others.SendAsync("ReceiveShoot", playerId, sequenceNumber, x, y, rotation);
+        }
     }
 
     // ---- HITS (authoritative: shooter's client detects collision, everyone applies damage) ----
@@ -97,7 +94,7 @@ public class TankHub : Hub
         string attackerId;
         lock (connectedPlayers)
         {
-            if (!connectedPlayers.TryGetValue(Context.ConnectionId, out attackerId))
+            if (!connectedPlayers.TryGetValue(Context.ConnectionId, out attackerId!))
                 return;
         }
 

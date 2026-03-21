@@ -119,6 +119,25 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &310824434 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8131205977912376167, guid: 915efdc1bb81eab469691439587c664a, type: 3}
+  m_PrefabInstance: {fileID: 1574880207}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &310824439
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 310824434}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 396e6d9152970bd4f93f08c869a1013e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkManager
+  playerId: Player1
+  simulatedPacketLossRate: 0
 --- !u!1001 &1366181864
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -129,11 +148,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3943542602948327119, guid: 915efdc1bb81eab469691439587c664a, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 8.15
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3943542602948327119, guid: 915efdc1bb81eab469691439587c664a, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.13
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3943542602948327119, guid: 915efdc1bb81eab469691439587c664a, type: 3}
       propertyPath: m_LocalPosition.z
@@ -179,6 +198,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8131205977912376167, guid: 915efdc1bb81eab469691439587c664a, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1533332446}
+    - targetCorrespondingSourceObject: {fileID: 8131205977912376167, guid: 915efdc1bb81eab469691439587c664a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1533332450}
   m_SourcePrefab: {fileID: 100100000, guid: 915efdc1bb81eab469691439587c664a, type: 3}
 --- !u!1 &1533332445 stripped
 GameObject:
@@ -198,6 +220,31 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RemoteTankController
   remotePlayerId: Player2
+--- !u!114 &1533332450
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1533332445}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac7dd059ff2e0054ca0b3ec9201b31e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TankController
+  moveSpeed: 5
+  rotateSpeed: 200
+  bulletPrefab: {fileID: 0}
+  firePoint: {fileID: 0}
+  fireRate: 0.3
+  boundaryPadding: 0.5
+  moveForwardKey: 0
+  moveBackwardKey: 0
+  rotateLeftKey: 0
+  rotateRightKey: 0
+  fireKey: 0
+  ownerPlayerId: Player2
+  offlineMode: 0
 --- !u!1001 &1574880207
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -208,11 +255,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3943542602948327119, guid: 915efdc1bb81eab469691439587c664a, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -7.14
+      value: -5
       objectReference: {fileID: 0}
     - target: {fileID: 3943542602948327119, guid: 915efdc1bb81eab469691439587c664a, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.04
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3943542602948327119, guid: 915efdc1bb81eab469691439587c664a, type: 3}
       propertyPath: m_LocalPosition.z
@@ -251,6 +298,14 @@ PrefabInstance:
       value: 32
       objectReference: {fileID: 0}
     - target: {fileID: 6105924758036062881, guid: 915efdc1bb81eab469691439587c664a, type: 3}
+      propertyPath: offlineMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6105924758036062881, guid: 915efdc1bb81eab469691439587c664a, type: 3}
+      propertyPath: ownerPlayerId
+      value: Player1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6105924758036062881, guid: 915efdc1bb81eab469691439587c664a, type: 3}
       propertyPath: rotateLeftKey
       value: 100
       objectReference: {fileID: 0}
@@ -273,7 +328,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 8131205977912376167, guid: 915efdc1bb81eab469691439587c664a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 310824439}
   m_SourcePrefab: {fileID: 100100000, guid: 915efdc1bb81eab469691439587c664a, type: 3}
 --- !u!1 &1822191431
 GameObject:
@@ -442,6 +500,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NetworkManager
   playerId: 
+  simulatedPacketLossRate: 0.1
 --- !u!4 &1852145711
 Transform:
   m_ObjectHideFlags: 0
