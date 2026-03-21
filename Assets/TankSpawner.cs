@@ -19,6 +19,11 @@ public class TankSpawner : MonoBehaviour
 
     /// <summary>Peers we heard about before NetworkManager.playerId was ready (ordering race).</summary>
     private List<string> pendingRemotePlayerIds = new List<string>();
+
+    void Awake()
+    {
+        networkManager = NetworkManager.Instance;
+    }
     
     void OnEnable()
     {
@@ -39,6 +44,20 @@ public class TankSpawner : MonoBehaviour
     void Start()
     {
         networkManager = NetworkManager.Instance;
+        FlushPendingRemotePlayers();
+    }
+
+    void Update()
+    {
+        if (pendingRemotePlayerIds.Count > 0)
+            FlushPendingRemotePlayers();
+    }
+
+    bool EnsureNetworkManager()
+    {
+        if (networkManager == null)
+            networkManager = NetworkManager.Instance;
+        return networkManager != null;
     }
     
     void OnPlayerAssigned(string playerId)
@@ -68,7 +87,7 @@ public class TankSpawner : MonoBehaviour
 
     void FlushPendingRemotePlayers()
     {
-        if (networkManager == null || string.IsNullOrEmpty(networkManager.playerId))
+        if (!EnsureNetworkManager() || string.IsNullOrEmpty(networkManager.playerId))
             return;
 
         for (int i = pendingRemotePlayerIds.Count - 1; i >= 0; i--)
@@ -106,7 +125,7 @@ public class TankSpawner : MonoBehaviour
     void OnPlayerConnected(string playerId)
     {
         Debug.Log($"TankSpawner: Peer event — '{playerId}' (our id: '{networkManager?.playerId ?? "(none yet)"}')");
-        if (networkManager != null && !string.IsNullOrEmpty(networkManager.playerId))
+        if (EnsureNetworkManager() && !string.IsNullOrEmpty(networkManager.playerId))
         {
             if (networkManager.playerId != playerId)
                 TrySpawnRemotePlayer(playerId);
@@ -202,7 +221,8 @@ public class TankSpawner : MonoBehaviour
         TankController localController = tank.GetComponent<TankController>();
         if (localController != null)
         {
-            DestroyImmediate(localController);
+            localController.enabled = false;
+            Destroy(localController);
         }
         
         RemoteTankController remoteController = tank.GetComponent<RemoteTankController>();
@@ -232,7 +252,7 @@ public class TankSpawner : MonoBehaviour
     void OnMovementReceived(string playerId, float x, float y, float rotation)
     {
         // Fallback: If we receive movement from a player but don't have their tank spawned, spawn it
-        if (networkManager != null && 
+        if (EnsureNetworkManager() && 
             !string.IsNullOrEmpty(networkManager.playerId) && 
             networkManager.playerId != playerId &&
             !spawnedTanks.ContainsKey(playerId))
