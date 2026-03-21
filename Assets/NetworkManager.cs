@@ -44,7 +44,8 @@ public class NetworkManager : MonoBehaviour
     private Dictionary<string, int> lastShootSeq = new Dictionary<string, int>();
 
     [Range(0f, 1f)]
-    public float simulatedPacketLossRate = 0.1f;
+    [Tooltip("Debug only: randomly drops movement/shoot messages. Keep at 0 for real play.")]
+    public float simulatedPacketLossRate = 0f;
 
     // pending playerId set by background thread, applied in Update()
     private string _pendingPlayerId = null;
@@ -191,31 +192,32 @@ public class NetworkManager : MonoBehaviour
         try
         {
             await connection.StartAsync();
-            Debug.Log("Connected to SignalR server!");
+            Debug.Log($"[Network] Connected to SignalR — you should see 'Assigned as Player1/Player2' next. State={connection.State}");
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Connection failed: {e.Message}");
+            Debug.LogError($"[Network] Connection failed to {serverUrl}: {e.Message}\n{e}");
         }
     }
 
-    public async Task SendMovement(float x, float y, float rotation)
+    /// <summary>
+    /// High-frequency: must use SendAsync, not InvokeAsync. InvokeAsync waits for a server ack each time;
+    /// firing ~60/sec without awaiting stacks thousands of round-trips and causes multi-second lag.
+    /// </summary>
+    public void SendMovement(float x, float y, float rotation)
     {
-        if (connection.State == HubConnectionState.Connected)
-        {
-            movementSequence++;
-            await connection.InvokeAsync("SendMovement", movementSequence, x, y, rotation);
-        }
+        if (connection == null || connection.State != HubConnectionState.Connected)
+            return;
+        movementSequence++;
+        _ = connection.SendAsync("SendMovement", movementSequence, x, y, rotation);
     }
 
-    public async Task SendShoot(float x, float y, float rotation)
+    public void SendShoot(float x, float y, float rotation)
     {
-        if (connection.State == HubConnectionState.Connected)
-        {
-            // counter, corrupting sequence tracking for both message types
-            shootSequence++;
-            await connection.InvokeAsync("SendShoot", shootSequence, x, y, rotation);
-        }
+        if (connection == null || connection.State != HubConnectionState.Connected)
+            return;
+        shootSequence++;
+        _ = connection.SendAsync("SendShoot", shootSequence, x, y, rotation);
     }
 
     public bool IsHubConnected =>

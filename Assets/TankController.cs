@@ -123,7 +123,7 @@ public class TankController : MonoBehaviour
         // Send our position to the server every frame (if networked)
         if (NetworkManager.Instance != null && NetworkManager.Instance.playerId == ownerPlayerId)
         {
-            _ = NetworkManager.Instance.SendMovement(
+            NetworkManager.Instance.SendMovement(
                 transform.position.x,
                 transform.position.y,
                 transform.rotation.eulerAngles.z
@@ -183,7 +183,7 @@ public class TankController : MonoBehaviour
         // After Instantiate, also tell the server we fired (if networked)
         if (NetworkManager.Instance != null && NetworkManager.Instance.playerId == ownerPlayerId)
         {
-            _ = NetworkManager.Instance.SendShoot(
+            NetworkManager.Instance.SendShoot(
                 firePoint.position.x,
                 firePoint.position.y,
                 firePoint.rotation.eulerAngles.z

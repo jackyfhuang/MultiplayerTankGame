@@ -21,8 +21,9 @@ app.UseCors();
 // Unity will connect to: ex. localhost:5000/tankgame
 app.MapHub<TankHub>("/tankgame");
 
-// Listen on all network interfaces (0.0.0.0) to allow external connections
-// Use localhost for local-only, or 0.0.0.0 for network access
+// launchSettings.json sets ASPNETCORE_URLS to http://localhost:5190 by default, which
+// only accepts connections from this machine. Clear and bind 0.0.0.0 so LAN clients work.
+app.Urls.Clear();
 app.Urls.Add("http://0.0.0.0:5190");
 
 app.Run();

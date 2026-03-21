@@ -16,6 +16,9 @@ public class TankSpawner : MonoBehaviour
     
     private Dictionary<string, GameObject> spawnedTanks = new Dictionary<string, GameObject>();
     private NetworkManager networkManager;
+
+    /// <summary>Peers we heard about before NetworkManager.playerId was ready (ordering race).</summary>
+    private List<string> pendingRemotePlayerIds = new List<string>();
     
     void OnEnable()
     {
@@ -42,7 +45,10 @@ public class TankSpawner : MonoBehaviour
     {
         Debug.Log($"TankSpawner: Player assigned as {playerId}");
         if (spawnedTanks.ContainsKey(playerId))
+        {
+            FlushPendingRemotePlayers();
             return;
+        }
 
         GameObject local = FindExistingLocalTank();
         if (local != null)
@@ -56,6 +62,30 @@ public class TankSpawner : MonoBehaviour
         }
         else
             SpawnLocalTank(playerId);
+
+        FlushPendingRemotePlayers();
+    }
+
+    void FlushPendingRemotePlayers()
+    {
+        if (networkManager == null || string.IsNullOrEmpty(networkManager.playerId))
+            return;
+
+        for (int i = pendingRemotePlayerIds.Count - 1; i >= 0; i--)
+        {
+            string pid = pendingRemotePlayerIds[i];
+            pendingRemotePlayerIds.RemoveAt(i);
+            if (pid != networkManager.playerId)
+                TrySpawnRemotePlayer(pid);
+        }
+    }
+
+    void TrySpawnRemotePlayer(string playerId)
+    {
+        if (spawnedTanks.ContainsKey(playerId))
+            return;
+        Debug.Log($"TankSpawner: Spawning remote tank for {playerId}");
+        SpawnRemoteTank(playerId);
     }
 
     static GameObject FindExistingLocalTank()
@@ -75,20 +105,17 @@ public class TankSpawner : MonoBehaviour
     
     void OnPlayerConnected(string playerId)
     {
-        Debug.Log($"TankSpawner: Player connected - {playerId} (Our ID: {networkManager?.playerId})");
-        // If it's not us, spawn a remote tank
-        if (networkManager != null && !string.IsNullOrEmpty(networkManager.playerId) && networkManager.playerId != playerId)
+        Debug.Log($"TankSpawner: Peer event — '{playerId}' (our id: '{networkManager?.playerId ?? "(none yet)"}')");
+        if (networkManager != null && !string.IsNullOrEmpty(networkManager.playerId))
         {
-            if (!spawnedTanks.ContainsKey(playerId))
-            {
-                Debug.Log($"TankSpawner: Spawning remote tank for {playerId}");
-                SpawnRemoteTank(playerId);
-            }
+            if (networkManager.playerId != playerId)
+                TrySpawnRemotePlayer(playerId);
+            return;
         }
-        else if (networkManager == null || string.IsNullOrEmpty(networkManager.playerId))
-        {
-            Debug.Log($"TankSpawner: NetworkManager not ready yet, will spawn remote tank for {playerId} later");
-        }
+
+        if (!pendingRemotePlayerIds.Contains(playerId))
+            pendingRemotePlayerIds.Add(playerId);
+        Debug.Log($"TankSpawner: Waiting for our AssignedPlayerId before spawning remote '{playerId}'");
     }
     
     void OnPlayerDisconnected(string playerId)
